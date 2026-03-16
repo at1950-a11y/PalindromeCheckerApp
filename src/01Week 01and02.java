@@ -844,3 +844,370 @@ public class AutocompleteSystem {
 }
 
 // Problem 8 :
+import java.util.*;
+
+public class ParkingLotSystem {
+
+    enum Status {
+        EMPTY, OCCUPIED, DELETED
+    }
+
+    static class ParkingSpot {
+        String licensePlate;
+        long entryTime;
+        Status status;
+
+        ParkingSpot() {
+            status = Status.EMPTY;
+        }
+    }
+
+    private ParkingSpot[] table;
+    private int capacity;
+    private int occupiedSpots = 0;
+    private int totalProbes = 0;
+    private int totalParks = 0;
+
+    public ParkingLotSystem(int capacity) {
+        this.capacity = capacity;
+        table = new ParkingSpot[capacity];
+
+        for (int i = 0; i < capacity; i++)
+            table[i] = new ParkingSpot();
+    }
+
+    // Hash function
+    private int hash(String licensePlate) {
+        return Math.abs(licensePlate.hashCode()) % capacity;
+    }
+
+    // Park vehicle
+    public void parkVehicle(String plate) {
+
+        int index = hash(plate);
+        int probes = 0;
+
+        while (table[index].status == Status.OCCUPIED) {
+            index = (index + 1) % capacity;
+            probes++;
+        }
+
+        table[index].licensePlate = plate;
+        table[index].entryTime = System.currentTimeMillis();
+        table[index].status = Status.OCCUPIED;
+
+        occupiedSpots++;
+        totalProbes += probes;
+        totalParks++;
+
+        System.out.println("parkVehicle(\"" + plate + "\") → Assigned spot #"
+                + index + " (" + probes + " probes)");
+    }
+
+    // Exit vehicle
+    public void exitVehicle(String plate) {
+
+        int index = hash(plate);
+
+        while (table[index].status != Status.EMPTY) {
+
+            if (table[index].status == Status.OCCUPIED &&
+                    table[index].licensePlate.equals(plate)) {
+
+                long durationMillis =
+                        System.currentTimeMillis() - table[index].entryTime;
+
+                double hours = durationMillis / (1000.0 * 60 * 60);
+
+                double fee = hours * 5; // $5 per hour
+
+                table[index].status = Status.DELETED;
+                occupiedSpots--;
+
+                System.out.println("exitVehicle(\"" + plate + "\") → Spot #" + index
+                        + " freed, Duration: "
+                        + String.format("%.2f", hours)
+                        + "h, Fee: $" + String.format("%.2f", fee));
+
+                return;
+            }
+
+            index = (index + 1) % capacity;
+        }
+
+        System.out.println("Vehicle not found");
+    }
+
+    // Find nearest available spot from entrance (spot 0)
+    public void findNearestSpot() {
+
+        for (int i = 0; i < capacity; i++) {
+
+            if (table[i].status != Status.OCCUPIED) {
+
+                System.out.println("Nearest available spot: #" + i);
+                return;
+            }
+        }
+
+        System.out.println("Parking lot full");
+    }
+
+    // Statistics
+    public void getStatistics() {
+
+        double occupancy =
+                (occupiedSpots * 100.0) / capacity;
+
+        double avgProbes =
+                totalParks == 0 ? 0 : (double) totalProbes / totalParks;
+
+        System.out.println("\nParking Statistics:");
+
+        System.out.println("Occupancy: "
+                + String.format("%.2f", occupancy) + "%");
+
+        System.out.println("Average Probes: "
+                + String.format("%.2f", avgProbes));
+    }
+
+    // Demo
+    public static void main(String[] args) throws InterruptedException {
+
+        ParkingLotSystem lot = new ParkingLotSystem(10);
+
+        lot.parkVehicle("ABC-1234");
+        lot.parkVehicle("ABC-1235");
+        lot.parkVehicle("XYZ-9999");
+
+        Thread.sleep(2000);
+
+        lot.exitVehicle("ABC-1234");
+
+        lot.findNearestSpot();
+
+        lot.getStatistics();
+    }
+}
+
+//Problem 9:
+import java.util.*;
+import java.text.*;
+
+public class TransactionAnalyzer {
+
+    static class Transaction {
+        int id;
+        double amount;
+        String merchant;
+        String account;
+        long timestamp; // epoch millis
+
+        public Transaction(int id, double amount, String merchant, String account, String timeStr) {
+            this.id = id;
+            this.amount = amount;
+            this.merchant = merchant;
+            this.account = account;
+
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
+                Date date = sdf.parse(timeStr);
+                this.timestamp = date.getTime();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "{id:" + id + ", amount:" + amount + ", merchant:" + merchant + ", account:" + account + "}";
+        }
+    }
+
+    List<Transaction> transactions = new ArrayList<>();
+
+    public void addTransaction(Transaction t) {
+        transactions.add(t);
+    }
+
+    // Classic Two-Sum
+    public List<List<Transaction>> findTwoSum(double target) {
+        Map<Double, Transaction> map = new HashMap<>();
+        List<List<Transaction>> result = new ArrayList<>();
+
+        for (Transaction t : transactions) {
+            double complement = target - t.amount;
+            if (map.containsKey(complement)) {
+                result.add(Arrays.asList(map.get(complement), t));
+            }
+            map.put(t.amount, t);
+        }
+        return result;
+    }
+
+    // Two-Sum within time window (in minutes)
+    public List<List<Transaction>> findTwoSumTimeWindow(double target, long windowMinutes) {
+        Map<Double, List<Transaction>> map = new HashMap<>();
+        List<List<Transaction>> result = new ArrayList<>();
+        long windowMillis = windowMinutes * 60 * 1000;
+
+        transactions.sort(Comparator.comparingLong(t -> t.timestamp));
+
+        for (Transaction t : transactions) {
+            double complement = target - t.amount;
+            if (map.containsKey(complement)) {
+                for (Transaction other : map.get(complement)) {
+                    if (Math.abs(t.timestamp - other.timestamp) <= windowMillis) {
+                        result.add(Arrays.asList(other, t));
+                    }
+                }
+            }
+            map.putIfAbsent(t.amount, new ArrayList<>());
+            map.get(t.amount).add(t);
+        }
+        return result;
+    }
+
+    // K-Sum
+    public List<List<Transaction>> findKSum(int k, double target) {
+        List<List<Transaction>> result = new ArrayList<>();
+        transactions.sort(Comparator.comparingDouble(t -> t.amount));
+        kSumHelper(transactions, 0, k, target, new ArrayList<>(), result);
+        return result;
+    }
+
+    private void kSumHelper(List<Transaction> list, int start, int k, double target,
+                            List<Transaction> path, List<List<Transaction>> res) {
+        if (k == 2) {
+            int left = start, right = list.size() - 1;
+            while (left < right) {
+                double sum = list.get(left).amount + list.get(right).amount;
+                if (Math.abs(sum - target) < 1e-6) {
+                    List<Transaction> temp = new ArrayList<>(path);
+                    temp.add(list.get(left));
+                    temp.add(list.get(right));
+                    res.add(temp);
+                    left++;
+                    right--;
+                } else if (sum < target) left++;
+                else right--;
+            }
+            return;
+        }
+
+        for (int i = start; i < list.size() - k + 1; i++) {
+            path.add(list.get(i));
+            kSumHelper(list, i + 1, k - 1, target - list.get(i).amount, path, res);
+            path.remove(path.size() - 1);
+        }
+    }
+
+    // Detect duplicates (same amount, same merchant, different accounts)
+    public List<Map<String, Object>> detectDuplicates() {
+        Map<String, Map<Double, Set<String>>> map = new HashMap<>();
+        List<Map<String, Object>> duplicates = new ArrayList<>();
+
+        for (Transaction t : transactions) {
+            map.putIfAbsent(t.merchant, new HashMap<>());
+            Map<Double, Set<String>> amtMap = map.get(t.merchant);
+            amtMap.putIfAbsent(t.amount, new HashSet<>());
+            Set<String> accounts = amtMap.get(t.amount);
+            accounts.add(t.account);
+        }
+
+        for (String merchant : map.keySet()) {
+            for (double amt : map.get(merchant).keySet()) {
+                Set<String> accounts = map.get(merchant).get(amt);
+                if (accounts.size() > 1) {
+                    Map<String, Object> entry = new HashMap<>();
+                    entry.put("merchant", merchant);
+                    entry.put("amount", amt);
+                    entry.put("accounts", accounts);
+                    duplicates.add(entry);
+                }
+            }
+        }
+        return duplicates;
+    }
+
+    // Demo
+    public static void main(String[] args) {
+        TransactionAnalyzer analyzer = new TransactionAnalyzer();
+
+        analyzer.addTransaction(new Transaction(1, 500, "Store A", "acc1", "10:00"));
+        analyzer.addTransaction(new Transaction(2, 300, "Store B", "acc2", "10:15"));
+        analyzer.addTransaction(new Transaction(3, 200, "Store C", "acc3", "10:30"));
+        analyzer.addTransaction(new Transaction(4, 500, "Store A", "acc2", "11:00"));
+
+        System.out.println("Classic Two-Sum (target=500):");
+        List<List<Transaction>> twoSum = analyzer.findTwoSum(500);
+        for (List<Transaction> pair : twoSum) System.out.println(pair);
+
+        System.out.println("\nTwo-Sum with 60min window (target=500):");
+        List<List<Transaction>> twoSumWindow = analyzer.findTwoSumTimeWindow(500, 60);
+        for (List<Transaction> pair : twoSumWindow) System.out.println(pair);
+
+        System.out.println("\nK-Sum (k=3, target=1000):");
+        List<List<Transaction>> kSum = analyzer.findKSum(3, 1000);
+        for (List<Transaction> combo : kSum) System.out.println(combo);
+
+        System.out.println("\nDuplicate detection:");
+        List<Map<String,Object>> duplicates = analyzer.detectDuplicates();
+        for (Map<String,Object> dup : duplicates) System.out.println(dup);
+    }
+}
+
+// Problem 10:
+import java.util.*;
+
+class MultiLevelCache {
+
+    private LinkedHashMap<String, String> L1;
+    private HashMap<String, String> L2;
+    private HashMap<String, Integer> accessCount;
+
+    private int L1_SIZE = 10000;
+    private int PROMOTION_THRESHOLD = 5;
+
+    public MultiLevelCache() {
+
+        L1 = new LinkedHashMap<String, String>(L1_SIZE, 0.75f, true) {
+            protected boolean removeEldestEntry(Map.Entry eldest) {
+                return size() > L1_SIZE;
+            }
+        };
+
+        L2 = new HashMap<>();
+        accessCount = new HashMap<>();
+    }
+
+    public String getVideo(String videoId) {
+
+        if (L1.containsKey(videoId)) {
+            System.out.println("L1 HIT");
+            return L1.get(videoId);
+        }
+
+        if (L2.containsKey(videoId)) {
+            System.out.println("L2 HIT");
+
+            int count = accessCount.getOrDefault(videoId,0)+1;
+            accessCount.put(videoId,count);
+
+            if(count > PROMOTION_THRESHOLD){
+                L1.put(videoId,L2.get(videoId));
+            }
+
+            return L2.get(videoId);
+        }
+
+        System.out.println("Database HIT");
+
+        String data = "VideoData_"+videoId;
+
+        L2.put(videoId,data);
+        accessCount.put(videoId,1);
+
+        return data;
+    }
+}
